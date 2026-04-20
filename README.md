@@ -70,6 +70,6 @@ Bash
 git init
 git add .
 git commit -m "Projeto inicial: Pipeline de Dados IoT"
-git remote add origin <URL_DO_REPOSITORIO>
+git remote add origin <(https://github.com/JorgeToshio/projeto-iot.git)>
 git push -u origin main
 Desenvolvido por: Jorge Toshio
