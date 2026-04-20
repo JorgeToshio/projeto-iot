@@ -8,31 +8,36 @@ def iniciar_banco():
     print("🚀 Iniciando processamento de dados...")
     
     try:
-        # 1. Ler o CSV
+        # 1. Antes de tudo, vamos remover as Views antigas para não dar erro de dependência
+        with engine.connect() as conexao:
+            print("🧹 Limpando Views antigas...")
+            conexao.execute(text("DROP VIEW IF EXISTS avg_temp_por_dispositivo CASCADE;"))
+            conexao.execute(text("DROP VIEW IF EXISTS leituras_por_hora CASCADE;"))
+            conexao.execute(text("DROP VIEW IF EXISTS temp_max_min_por_dia CASCADE;"))
+            conexao.commit()
+
+        # 2. Ler o CSV
         df = pd.read_csv('data/iot_data.csv')
         
-        # 2. Corrigir as colunas (Evitando duplicidade)
-        # Vamos usar 'room_id/id' como o nosso 'device_id' oficial
-        # E 'temp' como 'temperature'
+        # 3. Corrigir as colunas
         mapeamento = {
             'room_id/id': 'device_id',
             'temp': 'temperature'
         }
         df.rename(columns=mapeamento, inplace=True)
         
-        # 3. Converter a coluna de data para o formato real de data (importante!)
+        # Converter a coluna de data
         df['noted_date'] = pd.to_datetime(df['noted_date'], dayfirst=True)
 
-        # 4. Enviar para o banco
-        # if_exists='replace' vai apagar a tabela antiga e criar essa nova certinha
+        # 4. Agora sim, enviar para o banco (o replace vai funcionar agora)
         df.to_sql('temperature_readings', engine, if_exists='replace', index=False)
-        print("✅ Tabela 'temperature_readings' criada com sucesso!")
+        print("✅ Tabela 'temperature_readings' atualizada!")
 
-        # 5. Criar as Views SQL
+        # 5. Criar as Views SQL novamente
         with engine.connect() as conexao:
             # View 1: Média por dispositivo
             conexao.execute(text("""
-                CREATE OR REPLACE VIEW avg_temp_por_dispositivo AS
+                CREATE VIEW avg_temp_por_dispositivo AS
                 SELECT device_id, AVG(temperature) as avg_temp 
                 FROM temperature_readings 
                 GROUP BY device_id;
@@ -40,7 +45,7 @@ def iniciar_banco():
             
             # View 2: Leituras por hora
             conexao.execute(text("""
-                CREATE OR REPLACE VIEW leituras_por_hora AS
+                CREATE VIEW leituras_por_hora AS
                 SELECT date_trunc('hour', noted_date) as hora, COUNT(*) as contagem
                 FROM temperature_readings
                 GROUP BY hora;
@@ -48,7 +53,7 @@ def iniciar_banco():
 
             # View 3: Máximas e mínimas por dia
             conexao.execute(text("""
-                CREATE OR REPLACE VIEW temp_max_min_por_dia AS
+                CREATE VIEW temp_max_min_por_dia AS
                 SELECT noted_date::date as data, MAX(temperature) as temp_max, MIN(temperature) as temp_min
                 FROM temperature_readings
                 GROUP BY data;
@@ -56,8 +61,8 @@ def iniciar_banco():
             
             conexao.commit()
             
-        print("✅ Todas as 3 Views SQL foram criadas!")
-        print("✨ Agora rode o Dashboard.")
+        print("✅ Todas as 3 Views SQL foram recriadas!")
+        print("✨ Pode rodar o Dashboard agora.")
 
     except Exception as e:
         print(f"❌ Erro: {e}")
