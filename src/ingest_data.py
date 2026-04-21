@@ -8,14 +8,13 @@ def iniciar_banco():
     print("🚀 Iniciando processamento de dados...")
     
     try:
-        # 1. Antes de tudo, vamos remover as Views antigas para não dar erro de dependência
+        # 1. FORÇAR A REMOÇÃO DA TABELA E DE TUDO QUE DEPENDE DELA (Views)
         with engine.connect() as conexao:
-            print("🧹 Limpando Views antigas...")
-            conexao.execute(text("DROP VIEW IF EXISTS avg_temp_por_dispositivo CASCADE;"))
-            conexao.execute(text("DROP VIEW IF EXISTS leituras_por_hora CASCADE;"))
-            conexao.execute(text("DROP VIEW IF EXISTS temp_max_min_por_dia CASCADE;"))
+            print("🧹 Limpando banco de dados (Removendo tabela e views)...")
+            # O CASCADE deleta a tabela e já limpa as views de uma vez só
+            conexao.execute(text("DROP TABLE IF EXISTS temperature_readings CASCADE;"))
             conexao.commit()
-
+        
         # 2. Ler o CSV
         df = pd.read_csv('data/iot_data.csv')
         
@@ -29,12 +28,15 @@ def iniciar_banco():
         # Converter a coluna de data
         df['noted_date'] = pd.to_datetime(df['noted_date'], dayfirst=True)
 
-        # 4. Agora sim, enviar para o banco (o replace vai funcionar agora)
+        # 4. Enviar para o banco
+        # Como já deletamos a tabela manualmente acima, o replace vai funcionar sem erros
         df.to_sql('temperature_readings', engine, if_exists='replace', index=False)
-        print("✅ Tabela 'temperature_readings' atualizada!")
+        print("✅ Tabela 'temperature_readings' criada do zero!")
 
         # 5. Criar as Views SQL novamente
         with engine.connect() as conexao:
+            print("📊 Criando Views SQL...")
+            
             # View 1: Média por dispositivo
             conexao.execute(text("""
                 CREATE VIEW avg_temp_por_dispositivo AS
@@ -62,7 +64,7 @@ def iniciar_banco():
             conexao.commit()
             
         print("✅ Todas as 3 Views SQL foram recriadas!")
-        print("✨ Pode rodar o Dashboard agora.")
+        print("✨ Sucesso total. Pode rodar o Dashboard.")
 
     except Exception as e:
         print(f"❌ Erro: {e}")
